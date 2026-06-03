@@ -11,16 +11,17 @@ let
     // Extract Row 2 (dates) as a list
     Row2 = Record.ToList(Source{1}),
 
-    // Identify column positions where Row 2 contains the selected year (safe version)
+    // Identify column positions where Row 2's YEAR matches the parameter
     ColumnsToKeep =
         List.Select(
             List.Positions(Row2),
             each 
                 let
                     v = Row2{_},
-                    t = try Text.From(v) otherwise ""
+                    d = try Date.From(v) otherwise null,
+                    y = if d <> null then Date.Year(d) else null
                 in
-                    Text.Contains(t, Text.From(ParameterYear))
+                    y = ParameterYear
         ),
 
     // Reduce the table BEFORE doing any heavy transformations
