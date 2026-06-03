@@ -1,25 +1,34 @@
 let
     // Load external workbook
     Source = Excel.Workbook(File.Contents("C:\Path\YourFile.xlsx"), null, true),
-
-    // Pick the sheet or table you need
     Raw = Source{[Item="Sheet1", Kind="Sheet"]}[Data],
 
-    // Convert to table
-    ToTable = Table.PromoteHeaders(Raw, [PromoteAllScalars=true]),
-
     // Extract Row 1 (group names) and Row 2 (months)
-    Row1 = Raw{0},
-    Row2 = Raw{1},
+    Row1 = Record.ToList(Raw{0}),
+    Row2 = Record.ToList(Raw{1}),
+
+    // Fill down the group names (fixes merged-cell issue)
+    FilledRow1 =
+        List.Accumulate(
+            Row1,
+            {},
+            (state, current) =>
+                if List.IsEmpty(state) then
+                    { current }
+                else if current = null or current = "" then
+                    state & { List.Last(state) }
+                else
+                    state & { current }
+        ),
 
     // Build new headers: "<Month> - <Group>"
     NewHeaders =
         List.Transform(
-            List.Zip({Record.ToList(Row2), Record.ToList(Row1)}),
+            List.Zip({Row2, FilledRow1}),
             each Text.Combine(List.Transform(_, Text.From), " - ")
         ),
 
-    // Remove the first two rows (old headers)
+    // Remove first two rows
     Data = Table.Skip(Raw, 2),
 
     // Apply new headers
