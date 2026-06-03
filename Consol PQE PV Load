@@ -1,99 +1,33 @@
 let
-    // Load the full source table
-    Source = Excel.CurrentWorkbook(){[Name="Table1"]}[Content],
+    // Load external workbook
+    Source = Excel.Workbook(File.Contents("C:\Path\YourFile.xlsx"), null, true),
 
-    // Load the selected year from the Excel parameter table
-    ParameterYear =
-        List.First(
-            Excel.CurrentWorkbook(){[Name="Parameter_Year"]}[Content][Year]
-        ),
+    // Pick the sheet or table you need
+    Raw = Source{[Item="Sheet1", Kind="Sheet"]}[Data],
 
-    // Extract Row 1 and Row 2
-    Row1 = Record.ToList(Source{0}),
-    Row2 = Record.ToList(Source{1}),
+    // Convert to table
+    ToTable = Table.PromoteHeaders(Raw, [PromoteAllScalars=true]),
 
-    // Forward-fill Row 1 so every column has a cost category
-    FilledRow1 =
-        List.Accumulate(
-            List.Positions(Row1),
-            {},
-            (state, idx) =>
-                let
-                    current = Row1{idx},
-                    previous = if idx = 0 then current else List.Last(state),
-                    value = if current = null or current = "" then previous else current
-                in
-                    state & {value}
-        ),
+    // Extract Row 1 (group names) and Row 2 (months)
+    Row1 = Raw{0},
+    Row2 = Raw{1},
 
-    // Always keep Columns A:I (positions 0 to 8)
-    AlwaysKeep = {0..8},
-
-    // Extract A:I as a small safe table
-    FixedCols =
-        Table.SelectColumns(
-            Source,
-            List.Transform(AlwaysKeep, each Table.ColumnNames(Source){_})
-        ),
-
-    // Identify date columns by checking Row 2 for valid dates
-    DateColumnPositions =
-        List.Select(
-            List.Positions(Row2),
-            each (try Date.From(Row2{_}) otherwise null) <> null
-        ),
-
-    // Filter date columns by year BEFORE loading them
-    YearColumnPositions =
-        List.Select(
-            DateColumnPositions,
-            each 
-                let
-                    d = Date.From(Row2{_})
-                in
-                    Date.Year(d) = ParameterYear
-        ),
-
-    // Extract only the needed date columns
-    DateCols =
-        Table.SelectColumns(
-            Source,
-            List.Transform(YearColumnPositions, each Table.ColumnNames(Source){_})
-        ),
-
-    // Build headers for the date columns
-    Row1_R = List.Transform(YearColumnPositions, each FilledRow1{_}),
-    Row2_R = List.Transform(YearColumnPositions, each Row2{_}),
-    DateColNames = Table.ColumnNames(DateCols),
-
-    NewDateHeaders =
+    // Build new headers: "<Month> - <Group>"
+    NewHeaders =
         List.Transform(
-            List.Positions(DateColNames),
-            each Text.Combine(
-                {
-                    Text.From(Row1_R{_}),
-                    Text.From(Row2_R{_})
-                },
-                " "
-            )
+            List.Zip({Record.ToList(Row2), Record.ToList(Row1)}),
+            each Text.Combine(List.Transform(_, Text.From), " - ")
         ),
 
-    // Remove header rows from both tables
-    FixedData = Table.Skip(FixedCols, 2),
-    DateData = Table.Skip(DateCols, 2),
+    // Remove the first two rows (old headers)
+    Data = Table.Skip(Raw, 2),
 
-    // Apply new headers to date columns
-    RenamedDateData =
+    // Apply new headers
+    Renamed =
         Table.RenameColumns(
-            DateData,
-            List.Zip({DateColNames, NewDateHeaders})
-        ),
-
-    // Combine A:I + filtered date columns
-    Final =
-        Table.CombineColumns(
-            {FixedData, RenamedDateData},
-            {}
+            Data,
+            List.Zip({Table.ColumnNames(Data), NewHeaders}),
+            MissingField.Ignore
         )
 in
-    Final
+    Renamed
