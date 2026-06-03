@@ -71,6 +71,18 @@ let
         ),
 
     // ---------------------------------------------------
-    // 9. Keep only rows where at least one year-column has data
+    // 9. Filter rows ONLY based on year-columns (J:ACK)
+    //    A:I are always retained and never used in filtering
     // ---------------------------------------------------
+    Filtered =
+        Table.SelectRows(
+            Renamed,
+            each 
+                let
+                    YearValues = Record.SelectFields(_, ColumnsForYear),
+                    NonNullCount = List.NonNullCount(Record.ToList(YearValues))
+                in
+                    NonNullCount > 0
+        )
+in
     Filtered
