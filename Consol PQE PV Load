@@ -62,27 +62,29 @@ let
         ),
 
     // ---------------------------------------------------
-    // 8. Identify all columns that belong to the selected year
+    // 8. Identify columns A:I (positions 0 to 8)
     // ---------------------------------------------------
-    ColumnsForYear =
+    AlwaysKeep =
+        List.FirstN(Table.ColumnNames(Renamed), 9),
+
+    // ---------------------------------------------------
+    // 9. Identify all columns that belong to the selected year
+    // ---------------------------------------------------
+    YearColumns =
         List.Select(
             Table.ColumnNames(Renamed),
             each Text.Contains(_, ParameterYear)
         ),
 
     // ---------------------------------------------------
-    // 9. Filter rows ONLY based on year-columns (J:ACK)
-    //    A:I are always retained and never used in filtering
+    // 10. Combine the two lists (A:I + selected year columns)
+    // ---------------------------------------------------
+    ColumnsToKeep = List.Union({AlwaysKeep, YearColumns}),
+
+    // ---------------------------------------------------
+    // 11. Remove all other columns
     // ---------------------------------------------------
     Filtered =
-        Table.SelectRows(
-            Renamed,
-            each 
-                let
-                    YearValues = Record.SelectFields(_, ColumnsForYear),
-                    NonNullCount = List.NonNullCount(Record.ToList(YearValues))
-                in
-                    NonNullCount > 0
-        )
+        Table.SelectColumns(Renamed, ColumnsToKeep)
 in
     Filtered
