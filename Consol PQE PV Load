@@ -12,7 +12,7 @@ let
     Row2 = Record.ToList(Source{1}),
 
     // Identify column positions where Row 2's YEAR matches the parameter
-    ColumnsToKeep =
+    YearColumns =
         List.Select(
             List.Positions(Row2),
             each 
@@ -23,6 +23,12 @@ let
                 in
                     y = ParameterYear
         ),
+
+    // Always keep Columns A:I (positions 0 to 8)
+    AlwaysKeep = {0..8},
+
+    // Combine the always-keep columns with the year-matched columns
+    ColumnsToKeep = List.Union({AlwaysKeep, YearColumns}),
 
     // Reduce the table BEFORE doing any heavy transformations
     Reduced =
