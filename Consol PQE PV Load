@@ -1,13 +1,19 @@
 let
-    // Load external workbook
+    // ---------------------------
+    // 1. Load external workbook
+    // ---------------------------
     Source = Excel.Workbook(File.Contents("C:\Path\YourFile.xlsx"), null, true),
     Raw = Source{[Item="Sheet1", Kind="Sheet"]}[Data],
 
-    // Extract Row 1 (group names) and Row 2 (months)
+    // -----------------------------------------
+    // 2. Extract Row 1 (groups) and Row 2 (months)
+    // -----------------------------------------
     Row1 = Record.ToList(Raw{0}),
     Row2 = Record.ToList(Raw{1}),
 
-    // Fill down the group names (fixes merged-cell issue)
+    // ---------------------------------------------------
+    // 3. Fill down Row 1 to fix merged-cell group headers
+    // ---------------------------------------------------
     FilledRow1 =
         List.Accumulate(
             Row1,
@@ -21,22 +27,50 @@ let
                     state & { current }
         ),
 
-    // Build new headers: "<Month> - <Group>"
+    // ---------------------------------------------------
+    // 4. Build combined headers: "<Month> - <Group>"
+    // ---------------------------------------------------
     NewHeaders =
         List.Transform(
             List.Zip({Row2, FilledRow1}),
             each Text.Combine(List.Transform(_, Text.From), " - ")
         ),
 
-    // Remove first two rows
+    // -----------------------------------------
+    // 5. Remove first two rows (old headers)
+    // -----------------------------------------
     Data = Table.Skip(Raw, 2),
 
-    // Apply new headers
+    // -----------------------------------------
+    // 6. Apply new headers
+    // -----------------------------------------
     Renamed =
         Table.RenameColumns(
             Data,
             List.Zip({Table.ColumnNames(Data), NewHeaders}),
             MissingField.Ignore
-        )
-in
-    Renamed
+        ),
+
+    // ---------------------------------------------------
+    // 7. Load Parameter_Year and force to text
+    // ---------------------------------------------------
+    ParameterYear =
+        Text.From(
+            List.First(
+                Excel.CurrentWorkbook(){[Name="Parameter_Year"]}[Content][Year]
+            )
+        ),
+
+    // ---------------------------------------------------
+    // 8. Identify all columns that belong to the selected year
+    // ---------------------------------------------------
+    ColumnsForYear =
+        List.Select(
+            Table.ColumnNames(Renamed),
+            each Text.Contains(_, ParameterYear)
+        ),
+
+    // ---------------------------------------------------
+    // 9. Keep only rows where at least one year-column has data
+    // ---------------------------------------------------
+    Filtered
