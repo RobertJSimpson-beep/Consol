@@ -52,9 +52,9 @@ let
             List.Transform(ColumnsToKeep, each Table.ColumnNames(Source){_})
         ),
 
-    // Extract reduced Row 1 and Row 2
-    Row1_R = List.Select(FilledRow1, (v, idx) => List.Contains(ColumnsToKeep, idx)),
-    Row2_R = List.Select(Row2, (v, idx) => List.Contains(ColumnsToKeep, idx)),
+    // Align Row1 and Row2 with the Reduced table
+    Row1_R = List.Transform(ColumnsToKeep, each FilledRow1{_}),
+    Row2_R = List.Transform(ColumnsToKeep, each Row2{_}),
 
     // Original column names after reduction
     ColNames = Table.ColumnNames(Reduced),
