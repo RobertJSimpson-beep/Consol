@@ -43,4 +43,57 @@ let
             each (try Date.From(Row2{_}) otherwise null) <> null
         ),
 
-    // Filter date columns by year BEFORE loading
+    // Filter date columns by year BEFORE loading them
+    YearColumnPositions =
+        List.Select(
+            DateColumnPositions,
+            each 
+                let
+                    d = Date.From(Row2{_})
+                in
+                    Date.Year(d) = ParameterYear
+        ),
+
+    // Extract only the needed date columns
+    DateCols =
+        Table.SelectColumns(
+            Source,
+            List.Transform(YearColumnPositions, each Table.ColumnNames(Source){_})
+        ),
+
+    // Build headers for the date columns
+    Row1_R = List.Transform(YearColumnPositions, each FilledRow1{_}),
+    Row2_R = List.Transform(YearColumnPositions, each Row2{_}),
+    DateColNames = Table.ColumnNames(DateCols),
+
+    NewDateHeaders =
+        List.Transform(
+            List.Positions(DateColNames),
+            each Text.Combine(
+                {
+                    Text.From(Row1_R{_}),
+                    Text.From(Row2_R{_})
+                },
+                " "
+            )
+        ),
+
+    // Remove header rows from both tables
+    FixedData = Table.Skip(FixedCols, 2),
+    DateData = Table.Skip(DateCols, 2),
+
+    // Apply new headers to date columns
+    RenamedDateData =
+        Table.RenameColumns(
+            DateData,
+            List.Zip({DateColNames, NewDateHeaders})
+        ),
+
+    // Combine A:I + filtered date columns
+    Final =
+        Table.CombineColumns(
+            {FixedData, RenamedDateData},
+            {}
+        )
+in
+    Final
