@@ -1,0 +1,36 @@
+let
+    Source = Excel.CurrentWorkbook(){[Name="Table1"]}[Content],
+
+    // Read the selected year from the Excel parameter table
+    ParameterYear = Excel.CurrentWorkbook(){[Name="Parameter_Year"]}[Content]{0}[Year],
+
+    Row1 = Source{0},
+    Row2 = Source{1},
+
+    NewHeaders =
+        List.Transform(
+            List.Zip({Record.ToList(Row1), Record.ToList(Row2)}),
+            each Text.Combine(List.Transform(_, Text.From), " ")
+        ),
+
+    Data = Table.Skip(Source, 2),
+
+    Renamed = Table.RenameColumns(
+        Data,
+        List.Zip({Table.ColumnNames(Data), NewHeaders}),
+        MissingField.Ignore
+    ),
+
+    // Use the parameter instead of a hard-coded year
+    SelectedYear = ParameterYear,
+
+    FilteredColumns =
+        Table.SelectColumns(
+            Renamed,
+            List.Select(
+                Table.ColumnNames(Renamed),
+                each Text.Contains(_, Text.From(SelectedYear))
+            )
+        )
+in
+    FilteredColumns
