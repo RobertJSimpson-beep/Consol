@@ -8,10 +8,25 @@ let
             Excel.CurrentWorkbook(){[Name="Parameter_Year"]}[Content][Year]
         ),
 
-    // Extract Row 2 (dates) as a list
+    // Extract Row 1 and Row 2
+    Row1 = Record.ToList(Source{0}),
     Row2 = Record.ToList(Source{1}),
 
-    // Identify column positions where Row 2's YEAR matches the parameter
+    // Forward-fill Row 1 so every column has a cost category
+    FilledRow1 =
+        List.Accumulate(
+            List.Positions(Row1),
+            {},
+            (state, idx) =>
+                let
+                    current = Row1{idx},
+                    previous = if idx = 0 then current else List.Last(state),
+                    value = if current = null or current = "" then previous else current
+                in
+                    state & {value}
+        ),
+
+    // Identify columns where Row 2's YEAR matches the parameter
     YearColumns =
         List.Select(
             List.Positions(Row2),
@@ -37,15 +52,24 @@ let
             List.Transform(ColumnsToKeep, each Table.ColumnNames(Source){_})
         ),
 
-    // Extract the reduced Row 1 and Row 2
-    Row1_R = Reduced{0},
-    Row2_R = Reduced{1},
+    // Extract reduced Row 1 and Row 2
+    Row1_R = List.Select(FilledRow1, (v, idx) => List.Contains(ColumnsToKeep, idx)),
+    Row2_R = List.Select(Row2, (v, idx) => List.Contains(ColumnsToKeep, idx)),
 
-    // Build new combined headers: "<Cost Category> <Month> <Year>"
+    // Original column names after reduction
+    ColNames = Table.ColumnNames(Reduced),
+
+    // Build new combined headers
     NewHeaders =
         List.Transform(
-            List.Zip({Record.ToList(Row1_R), Record.ToList(Row2_R)}),
-            each Text.Combine(List.Transform(_, Text.From), " ")
+            List.Positions(ColNames),
+            each Text.Combine(
+                {
+                    Text.From(Row1_R{_}),
+                    Text.From(Row2_R{_})
+                },
+                " "
+            )
         ),
 
     // Remove the first two rows (header rows)
@@ -55,7 +79,7 @@ let
     Renamed =
         Table.RenameColumns(
             Data,
-            List.Zip({Table.ColumnNames(Data), NewHeaders})
+            List.Zip({ColNames, NewHeaders})
         )
 in
     Renamed
