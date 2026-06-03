@@ -26,60 +26,21 @@ let
                     state & {value}
         ),
 
-    // Identify columns where Row 2's YEAR matches the parameter
-    YearColumns =
-        List.Select(
-            List.Positions(Row2),
-            each 
-                let
-                    v = Row2{_},
-                    d = try Date.From(v) otherwise null,
-                    y = if d <> null then Date.Year(d) else null
-                in
-                    y = ParameterYear
-        ),
-
     // Always keep Columns A:I (positions 0 to 8)
     AlwaysKeep = {0..8},
 
-    // Combine the always-keep columns with the year-matched columns
-    ColumnsToKeep = List.Union({AlwaysKeep, YearColumns}),
-
-    // Reduce the table BEFORE doing any heavy transformations
-    Reduced =
+    // Extract A:I as a small safe table
+    FixedCols =
         Table.SelectColumns(
             Source,
-            List.Transform(ColumnsToKeep, each Table.ColumnNames(Source){_})
+            List.Transform(AlwaysKeep, each Table.ColumnNames(Source){_})
         ),
 
-    // Align Row1 and Row2 with the Reduced table
-    Row1_R = List.Transform(ColumnsToKeep, each FilledRow1{_}),
-    Row2_R = List.Transform(ColumnsToKeep, each Row2{_}),
-
-    // Original column names after reduction
-    ColNames = Table.ColumnNames(Reduced),
-
-    // Build new combined headers
-    NewHeaders =
-        List.Transform(
-            List.Positions(ColNames),
-            each Text.Combine(
-                {
-                    Text.From(Row1_R{_}),
-                    Text.From(Row2_R{_})
-                },
-                " "
-            )
+    // Identify date columns by checking Row 2 for valid dates
+    DateColumnPositions =
+        List.Select(
+            List.Positions(Row2),
+            each (try Date.From(Row2{_}) otherwise null) <> null
         ),
 
-    // Remove the first two rows (header rows)
-    Data = Table.Skip(Reduced, 2),
-
-    // Apply the new headers
-    Renamed =
-        Table.RenameColumns(
-            Data,
-            List.Zip({ColNames, NewHeaders})
-        )
-in
-    Renamed
+    // Filter date columns by year BEFORE loading
