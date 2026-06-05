@@ -1,42 +1,43 @@
-Sub DeleteQuarterRows()
+Sub ZoomAndCleanAll()
 
-    Dim tabs As Variant
     Dim ws As Worksheet
+    Dim zoomCells As Variant
+    Dim cellRef As Variant
     Dim lastRow As Long
-    Dim r As Long
-    Dim val As String
-    Dim t As Variant
+    Dim i As Long
 
-    ' Tabs to process
-    tabs = Array("Essbase Actuals", "Essbase Forecast", "Essbase Budget")
+    ' List of sheets to process in order
+    Dim sheetsToDo As Variant
+    sheetsToDo = Array("Essbase Actuals", "Essbase Forecast")
 
-    For Each t In tabs
-        
-        On Error Resume Next
-        Set ws = Worksheets(t)
-        If ws Is Nothing Then
-            MsgBox "Sheet not found: " & t
-            Err.Clear
-            On Error GoTo 0
-            GoTo NextSheet
+    ' Cells to zoom into on each sheet
+    zoomCells = Array("A4", "C4", "E4")
+
+    For Each ws In ThisWorkbook.Worksheets
+        If Not IsError(Application.Match(ws.Name, sheetsToDo, 0)) Then
+
+            ws.Activate
+
+            ' --- Step 1: Zoom to A4 ---
+            Range("A4").Select
+            ActiveWindow.Zoom = True
+
+            ' --- Step 2: Delete rows where Column A contains "Q" ---
+            lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+
+            For i = lastRow To 1 Step -1
+                If InStr(1, ws.Cells(i, "A").Value, "Q", vbTextCompare) > 0 Then
+                    ws.Rows(i).Delete
+                End If
+            Next i
+
+            ' --- Step 3: Continue zooming to other cells ---
+            For Each cellRef In zoomCells
+                ws.Range(cellRef).Select
+                ActiveWindow.Zoom = True
+            Next cellRef
+
         End If
-        On Error GoTo 0
-        
-        lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
-        
-        ' Loop bottom‑up to safely delete rows
-        For r = lastRow To 1 Step -1
-            val = Trim(UCase(ws.Cells(r, "A").Value))
-            
-            If val = "Q1" Or val = "Q2" Or val = "Q3" Or val = "Q4" Then
-                ws.Rows(r).Delete
-            End If
-        Next r
-        
-NextSheet:
-        Set ws = Nothing
-    Next t
-
-    MsgBox "Quarter rows deleted from all tabs."
+    Next ws
 
 End Sub
