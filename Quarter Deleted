@@ -1,43 +1,76 @@
-Sub ZoomAndCleanAll()
+' Smart View API declaration
+Private Declare Function HypZoomIn Lib "HsAddin" _
+(ByVal vtSheetName As Variant, ByVal vtSelection As Variant, _
+ ByVal vtLevel As Variant, ByVal vtAcross As Variant) As Long
 
+Sub ZoomAllTabs()
+
+    Dim tabs As Variant
+    Dim cells As Variant
+    Dim t As Variant
+    Dim c As Variant
+    Dim result As Long
     Dim ws As Worksheet
-    Dim zoomCells As Variant
-    Dim cellRef As Variant
     Dim lastRow As Long
     Dim i As Long
-
-    ' List of sheets to process in order
-    Dim sheetsToDo As Variant
-    sheetsToDo = Array("Essbase Actuals", "Essbase Forecast")
-
-    ' Cells to zoom into on each sheet
-    zoomCells = Array("A4", "C4", "E4")
-
-    For Each ws In ThisWorkbook.Worksheets
-        If Not IsError(Application.Match(ws.Name, sheetsToDo, 0)) Then
-
-            ws.Activate
-
-            ' --- Step 1: Zoom to A4 ---
-            Range("A4").Select
-            ActiveWindow.Zoom = True
-
-            ' --- Step 2: Delete rows where Column A contains "Q" ---
-            lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
-
-            For i = lastRow To 1 Step -1
-                If InStr(1, ws.Cells(i, "A").Value, "Q", vbTextCompare) > 0 Then
-                    ws.Rows(i).Delete
-                End If
-            Next i
-
-            ' --- Step 3: Continue zooming to other cells ---
-            For Each cellRef In zoomCells
-                ws.Range(cellRef).Select
-                ActiveWindow.Zoom = True
-            Next cellRef
-
+    
+    ' Tabs to process
+    tabs = Array("Essbase Actuals", "Essbase Forecast", "Essbase Budget")
+    
+    ' Cells to zoom in on AFTER cleaning
+    cells = Array("C4", "E4")
+    
+    For Each t In tabs
+        
+        On Error Resume Next
+        Set ws = Worksheets(t)
+        If ws Is Nothing Then
+            MsgBox "Sheet not found: " & t
+            Err.Clear
+            On Error GoTo 0
+            GoTo NextSheet
         End If
-    Next ws
+        On Error GoTo 0
+        
+        ws.Activate
+        
+        ' ---------------------------------------------------------
+        ' 1) FIRST ZOOM: A4 (before deleting Q rows)
+        ' ---------------------------------------------------------
+        ws.Range("A4").Select
+        result = HypZoomIn(Empty, ws.Range("A4"), 2, False)
+        
+        If result <> 0 Then
+            MsgBox "Zoom failed on " & t & " at cell A4"
+        End If
+        
+        ' ---------------------------------------------------------
+        ' 2) DELETE ROWS WHERE COLUMN A CONTAINS "Q"
+        ' ---------------------------------------------------------
+        lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+        
+        For i = lastRow To 1 Step -1
+            If InStr(1, ws.Cells(i, "A").Value, "Q", vbTextCompare) > 0 Then
+                ws.Rows(i).Delete
+            End If
+        Next i
+        
+        ' ---------------------------------------------------------
+        ' 3) CONTINUE ORIGINAL ZOOMS (C4, E4, etc.)
+        ' ---------------------------------------------------------
+        For Each c In cells
+            ws.Range(c).Select
+            result = HypZoomIn(Empty, ws.Range(c), 2, False)
+            
+            If result <> 0 Then
+                MsgBox "Zoom failed on " & t & " at cell " & c
+            End If
+        Next c
+        
+NextSheet:
+        Set ws = Nothing
+    Next t
+    
+    MsgBox "All Zoom‑Ins and Q‑Row Removals Completed."
 
 End Sub
