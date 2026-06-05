@@ -29,8 +29,8 @@ Sub BuildMasterData()
     ' Sheets to pull from
     srcSheets = Array("Essbase Actuals", "Essbase Forecast", "Essbase Budget")
 
-    ' Destination sheet
-    Set wsDest = Workbooks("MasterData.xlsx").Worksheets("MasterData")
+    ' Destination sheet is in THIS workbook
+    Set wsDest = ThisWorkbook.Worksheets("MasterData")
 
     ' ---------------------------------------------------------
     ' 1) Find first row where Column K = 2026 on MasterData
