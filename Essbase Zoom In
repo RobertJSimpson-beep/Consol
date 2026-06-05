@@ -1,0 +1,48 @@
+' Smart View API declaration
+Private Declare Function HypZoomIn Lib "HsAddin" _
+(ByVal vtSheetName As Variant, ByVal vtSelection As Variant, _
+ ByVal vtLevel As Variant, ByVal vtAcross As Variant) As Long
+
+Sub ZoomAllTabs()
+
+    Dim tabs As Variant
+    Dim cells As Variant
+    Dim t As Variant
+    Dim c As Variant
+    Dim result As Long
+    
+    ' Tabs to process
+    tabs = Array("Essbase Actuals", "Essbase Forecast", "Essbase Budget")
+    
+    ' Cells to zoom in on (in order)
+    cells = Array("A4", "C4", "E4")
+    
+    For Each t In tabs
+        
+        On Error Resume Next
+        Worksheets(t).Activate
+        If Err.Number <> 0 Then
+            MsgBox "Sheet not found: " & t
+            Err.Clear
+            On Error GoTo 0
+            GoTo NextSheet
+        End If
+        On Error GoTo 0
+        
+        For Each c In cells
+            Range(c).Select
+            
+            ' Zoom Level 2 = Bottom Level
+            result = HypZoomIn(Empty, Range(c), 2, False)
+            
+            If result <> 0 Then
+                MsgBox "Zoom failed on " & t & " at cell " & c
+            End If
+        Next c
+        
+NextSheet:
+    Next t
+    
+    MsgBox "All Zoom‑Ins Completed."
+
+End Sub
