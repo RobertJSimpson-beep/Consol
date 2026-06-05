@@ -1,0 +1,99 @@
+Sub BuildMasterData()
+
+    Dim srcSheets As Variant
+    Dim sheetName As Variant
+    Dim wsSrc As Worksheet
+    Dim wsDest As Worksheet
+    Dim lastRowSrc As Long
+    Dim lastRowDest As Long
+    Dim first2026Row As Long
+    Dim i As Long
+    Dim labelText As String
+    Dim srcWb As Workbook
+    Dim filePath As Variant
+
+    ' ---------------------------------------------------------
+    ' 0) Ask user to select the Essbase workbook
+    ' ---------------------------------------------------------
+    filePath = Application.GetOpenFilename( _
+                FileFilter:="Excel Files (*.xlsx;*.xlsm),*.xlsx;*.xlsm", _
+                Title:="Select the Essbase Source File")
+
+    If filePath = False Then
+        MsgBox "No file selected. Process cancelled."
+        Exit Sub
+    End If
+
+    Set srcWb = Workbooks.Open(filePath)
+
+    ' Sheets to pull from
+    srcSheets = Array("Essbase Actuals", "Essbase Forecast", "Essbase Budget")
+
+    ' Destination sheet
+    Set wsDest = Workbooks("MasterData.xlsx").Worksheets("MasterData")
+
+    ' ---------------------------------------------------------
+    ' 1) Find first row where Column K = 2026 on MasterData
+    ' ---------------------------------------------------------
+    first2026Row = 0
+    For i = 1 To wsDest.Cells(wsDest.Rows.Count, "K").End(xlUp).Row
+        If wsDest.Cells(i, "K").Value = 2026 Then
+            first2026Row = i
+            Exit For
+        End If
+    Next i
+
+    If first2026Row = 0 Then
+        MsgBox "No row with 2026 found in Column K on MasterData."
+        Exit Sub
+    End If
+
+    ' ---------------------------------------------------------
+    ' 2) Clear A:I starting at that row
+    ' ---------------------------------------------------------
+    wsDest.Range("A" & first2026Row & ":I" & wsDest.Rows.Count).ClearContents
+
+    ' ---------------------------------------------------------
+    ' 3) Loop through each Essbase sheet and append data
+    ' ---------------------------------------------------------
+    For Each sheetName In srcSheets
+
+        On Error Resume Next
+        Set wsSrc = srcWb.Worksheets(sheetName)
+        On Error GoTo 0
+
+        If wsSrc Is Nothing Then
+            MsgBox "Sheet not found in source file: " & sheetName
+            GoTo NextSheet
+        End If
+
+        ' Find last row in source sheet
+        lastRowSrc = wsSrc.Cells(wsSrc.Rows.Count, "A").End(xlUp).Row
+
+        ' Find next empty row in MasterData
+        lastRowDest = wsDest.Cells(wsDest.Rows.Count, "A").End(xlUp).Row + 1
+
+        ' Determine label for Column J
+        Select Case sheetName
+            Case "Essbase Actuals": labelText = "Actual"
+            Case "Essbase Forecast": labelText = "Forecast"
+            Case "Essbase Budget": labelText = "Budget"
+        End Select
+
+        ' ---------------------------------------------------------
+        ' COPY ONLY ROWS 5 DOWNWARDS (skip first 4 rows)
+        ' ---------------------------------------------------------
+        If lastRowSrc >= 5 Then
+            wsSrc.Range("A5:I" & lastRowSrc).Copy wsDest.Range("A" & lastRowDest)
+
+            ' Add label in Column J for each copied row
+            wsDest.Range("J" & lastRowDest & ":J" & (lastRowDest + (lastRowSrc - 5))).Value = labelText
+        End If
+
+NextSheet:
+        Set wsSrc = Nothing
+    Next sheetName
+
+    MsgBox "MasterData updated successfully."
+
+End Sub
