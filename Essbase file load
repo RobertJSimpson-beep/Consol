@@ -1,4 +1,4 @@
-Sub ImportEssbaseData_Table2()
+Sub ImportEssbaseData_AppendOnly()
 
     Dim srcWb As Workbook
     Dim wsSrc As Worksheet
@@ -10,12 +10,9 @@ Sub ImportEssbaseData_Table2()
     Dim sheetName As Variant
     Dim lastRowSrc As Long
     Dim currentYear As Long
-    Dim priorYear As Long
     Dim labelText As String
     Dim dataRows As Long
     Dim insertRow As Long
-    Dim rngYearCol As Range
-    Dim f As Range
 
     ' ---------------------------------------------------------
     ' SPEED BOOSTERS
@@ -25,14 +22,13 @@ Sub ImportEssbaseData_Table2()
     Application.Calculation = xlCalculationManual
 
     ' ---------------------------------------------------------
-    ' 0) Get current year from Parameter_Year table on Input sheet
+    ' 1) Get current year from Parameter_Year table on Input sheet
     ' ---------------------------------------------------------
     Set wsInput = ThisWorkbook.Worksheets("Input")
     currentYear = wsInput.ListObjects("Parameter_Year").ListColumns("Year").DataBodyRange.Cells(1, 1).Value
-    priorYear = currentYear - 1
 
     ' ---------------------------------------------------------
-    ' 1) Ask user to select the Essbase workbook
+    ' 2) Ask user to select the Essbase workbook
     ' ---------------------------------------------------------
     filePath = Application.GetOpenFilename( _
                 FileFilter:="Excel Files (*.xlsx;*.xlsm),*.xlsx;*.xlsm", _
@@ -43,51 +39,21 @@ Sub ImportEssbaseData_Table2()
     Set srcWb = Workbooks.Open(filePath)
 
     ' ---------------------------------------------------------
-    ' 2) Destination sheet and table
+    ' 3) Destination table
     ' ---------------------------------------------------------
     Set wsDest = ThisWorkbook.Worksheets("MasterData")
     Set lo = wsDest.ListObjects("Table2")
 
-    ' ---------------------------------------------------------
-    ' 3) FILTER Table2 to current year in Year column and CLEAR A:K
-    ' ---------------------------------------------------------
-    With lo
-        ' Filter on Year column (contains current year)
-        .Range.AutoFilter Field:=.ListColumns("Year").Index, _
-                          Criteria1:="=*" & CStr(currentYear) & "*"
-
-        On Error Resume Next
-        ' Clear A:K for visible rows in the table body
-        Intersect(.DataBodyRange.SpecialCells(xlCellTypeVisible), _
-                  .DataBodyRange.Columns("A:K")).ClearContents
-        On Error GoTo 0
-
-        ' Remove filter
-        If wsDest.AutoFilterMode Then wsDest.AutoFilterMode = False
-    End With
+    ' Find first empty row AFTER the table
+    insertRow = lo.Range.Rows(lo.Range.Rows.Count).Row + 1
 
     ' ---------------------------------------------------------
-    ' 4) FIND first row AFTER prior year (e.g. after 2025) in column K
+    ' 4) Sheets to import
     ' ---------------------------------------------------------
-    Set rngYearCol = lo.ListColumns("Year").DataBodyRange
-
-    Set f = rngYearCol.Find(What:=priorYear, LookIn:=xlValues, LookAt:=xlWhole, _
-                            SearchOrder:=xlByRows, SearchDirection:=xlPrevious)
-
-    If Not f Is Nothing Then
-        insertRow = f.Row + 1          ' first row after prior year
-    Else
-        ' If prior year not found, start at first data row of the table
-        insertRow = lo.DataBodyRange.Rows(1).Row
-    End If
+    srcSheets = Array("Essbase Actuals", "Essbase Forecast", "Essbase Budget")
 
     ' ---------------------------------------------------------
-    ' 5) Sheets to import
-    ' ---------------------------------------------------------
-    srcSheets = Array("Essbase Actual", "Essbase Forecast", "Essbase Budget")
-
-    ' ---------------------------------------------------------
-    ' 6) Loop through each Essbase sheet and paste after prior year
+    ' 5) Loop through each Essbase sheet and append to Table2
     ' ---------------------------------------------------------
     For Each sheetName In srcSheets
 
@@ -104,7 +70,7 @@ Sub ImportEssbaseData_Table2()
 
         ' Label for Column J
         Select Case sheetName
-            Case "Essbase Actual": labelText = "Actual"
+            Case "Essbase Actuals": labelText = "Actual"
             Case "Essbase Forecast": labelText = "Forecast"
             Case "Essbase Budget": labelText = "Budget"
         End Select
@@ -128,7 +94,7 @@ NextSheet:
 
     srcWb.Close SaveChanges:=False
 
-    MsgBox "Essbase data imported successfully."
+    MsgBox "Essbase data appended successfully."
 
 Cleanup:
     Application.ScreenUpdating = True
