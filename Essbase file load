@@ -1,19 +1,24 @@
-Sub BuildMasterData()
+Sub ImportEssbaseData()
 
-    Dim srcSheets As Variant
-    Dim sheetName As Variant
+    Dim srcWb As Workbook
     Dim wsSrc As Worksheet
     Dim wsDest As Worksheet
+    Dim filePath As Variant
+    Dim srcSheets As Variant
+    Dim sheetName As Variant
     Dim lastRowSrc As Long
     Dim lastRowDest As Long
-    Dim first2026Row As Long
+    Dim currentYear As Long
     Dim i As Long
     Dim labelText As String
-    Dim srcWb As Workbook
-    Dim filePath As Variant
 
     ' ---------------------------------------------------------
-    ' 0) Ask user to select the Essbase workbook
+    ' 0) Get current year from Parameter_Year table
+    ' ---------------------------------------------------------
+    currentYear = ThisWorkbook.Worksheets("Parameter_Year").Range("Year").Value
+
+    ' ---------------------------------------------------------
+    ' 1) Ask user to select the Essbase workbook
     ' ---------------------------------------------------------
     filePath = Application.GetOpenFilename( _
                 FileFilter:="Excel Files (*.xlsx;*.xlsm),*.xlsx;*.xlsm", _
@@ -26,35 +31,30 @@ Sub BuildMasterData()
 
     Set srcWb = Workbooks.Open(filePath)
 
-    ' Sheets to pull from
-    srcSheets = Array("Essbase Actuals", "Essbase Forecast", "Essbase Budget")
-
-    ' Destination sheet is in THIS workbook
+    ' ---------------------------------------------------------
+    ' 2) Destination sheet
+    ' ---------------------------------------------------------
     Set wsDest = ThisWorkbook.Worksheets("MasterData")
 
     ' ---------------------------------------------------------
-    ' 1) Find first row where Column K = 2026 on MasterData
+    ' 3) Clear A:I for rows where Column K = current year
     ' ---------------------------------------------------------
-    first2026Row = 0
-    For i = 1 To wsDest.Cells(wsDest.Rows.Count, "K").End(xlUp).Row
-        If wsDest.Cells(i, "K").Value = 2026 Then
-            first2026Row = i
-            Exit For
+    Dim lastRowDestAll As Long
+    lastRowDestAll = wsDest.Cells(wsDest.Rows.Count, "K").End(xlUp).Row
+
+    For i = lastRowDestAll To 1 Step -1
+        If wsDest.Cells(i, "K").Value = currentYear Then
+            wsDest.Range("A" & i & ":I" & i).ClearContents
         End If
     Next i
 
-    If first2026Row = 0 Then
-        MsgBox "No row with 2026 found in Column K on MasterData."
-        Exit Sub
-    End If
+    ' ---------------------------------------------------------
+    ' 4) Sheets to import
+    ' ---------------------------------------------------------
+    srcSheets = Array("Essbase Actual", "Essbase Forecast", "Essbase Budget")
 
     ' ---------------------------------------------------------
-    ' 2) Clear A:I starting at that row
-    ' ---------------------------------------------------------
-    wsDest.Range("A" & first2026Row & ":I" & wsDest.Rows.Count).ClearContents
-
-    ' ---------------------------------------------------------
-    ' 3) Loop through each Essbase sheet and append data
+    ' 5) Loop through each Essbase sheet
     ' ---------------------------------------------------------
     For Each sheetName In srcSheets
 
@@ -63,7 +63,7 @@ Sub BuildMasterData()
         On Error GoTo 0
 
         If wsSrc Is Nothing Then
-            MsgBox "Sheet not found in source file: " & sheetName
+            MsgBox "Sheet not found: " & sheetName
             GoTo NextSheet
         End If
 
@@ -75,25 +75,36 @@ Sub BuildMasterData()
 
         ' Determine label for Column J
         Select Case sheetName
-            Case "Essbase Actuals": labelText = "Actual"
+            Case "Essbase Actual": labelText = "Actual"
             Case "Essbase Forecast": labelText = "Forecast"
             Case "Essbase Budget": labelText = "Budget"
         End Select
 
         ' ---------------------------------------------------------
-        ' COPY ONLY ROWS 5 DOWNWARDS (skip first 4 rows)
+        ' COPY ONLY ROWS 4 DOWNWARDS (your data starts on row 4)
         ' ---------------------------------------------------------
-        If lastRowSrc >= 5 Then
-            wsSrc.Range("A5:I" & lastRowSrc).Copy wsDest.Range("A" & lastRowDest)
+        If lastRowSrc >= 4 Then
 
-            ' Add label in Column J for each copied row
-            wsDest.Range("J" & lastRowDest & ":J" & (lastRowDest + (lastRowSrc - 5))).Value = labelText
+            ' Copy A:I
+            wsSrc.Range("A4:I" & lastRowSrc).Copy wsDest.Range("A" & lastRowDest)
+
+            ' Fill Column J with label
+            wsDest.Range("J" & lastRowDest & ":J" & (lastRowDest + (lastRowSrc - 4))).Value = labelText
+
+            ' Fill Column K with current year
+            wsDest.Range("K" & lastRowDest & ":K" & (lastRowDest + (lastRowSrc - 4))).Value = currentYear
+
         End If
 
 NextSheet:
         Set wsSrc = Nothing
     Next sheetName
 
-    MsgBox "MasterData updated successfully."
+    ' ---------------------------------------------------------
+    ' 6) Close source workbook (optional)
+    ' ---------------------------------------------------------
+    srcWb.Close SaveChanges:=False
+
+    MsgBox "Essbase data imported successfully."
 
 End Sub
