@@ -3,6 +3,7 @@ Sub ImportEssbaseData()
     Dim srcWb As Workbook
     Dim wsSrc As Worksheet
     Dim wsDest As Worksheet
+    Dim wsInput As Worksheet
     Dim filePath As Variant
     Dim srcSheets As Variant
     Dim sheetName As Variant
@@ -13,9 +14,11 @@ Sub ImportEssbaseData()
     Dim labelText As String
 
     ' ---------------------------------------------------------
-    ' 0) Get current year from Parameter_Year table
+    ' 0) Get current year from Parameter_Year table on Input sheet
+    '    Assumes the table has a column named "Year"
     ' ---------------------------------------------------------
-    currentYear = ThisWorkbook.Worksheets("Parameter_Year").Range("Year").Value
+    Set wsInput = ThisWorkbook.Worksheets("Input")
+    currentYear = wsInput.ListObjects("Parameter_Year").ListColumns("Year").DataBodyRange.Cells(1, 1).Value
 
     ' ---------------------------------------------------------
     ' 1) Ask user to select the Essbase workbook
