@@ -3,46 +3,65 @@ Private Declare Function HypZoomIn Lib "HsAddin" _
 (ByVal vtSheetName As Variant, ByVal vtSelection As Variant, _
  ByVal vtLevel As Variant, ByVal vtAcross As Variant) As Long
 
-Sub ZoomAllTabs()
+Private Declare Function HypMenuVZoomIn Lib "HsAddin" () As Long
+
+
+Sub ZoomAllTabs_NoQDeletion()
 
     Dim tabs As Variant
-    Dim cells As Variant
     Dim t As Variant
-    Dim c As Variant
     Dim result As Long
-    
+    Dim ws As Worksheet
+    Dim zoomCells As Variant
+    Dim c As Variant
+
     ' Tabs to process
     tabs = Array("Essbase Actuals", "Essbase Forecast", "Essbase Budget")
-    
-    ' Cells to zoom in on (in order)
-    cells = Array("A4", "C4", "E4")
-    
+
+    ' Cells to zoom in on after A4
+    zoomCells = Array("C4", "E4")
+
     For Each t In tabs
-        
+
         On Error Resume Next
-        Worksheets(t).Activate
-        If Err.Number <> 0 Then
+        Set ws = Worksheets(t)
+        On Error GoTo 0
+
+        If ws Is Nothing Then
             MsgBox "Sheet not found: " & t
-            Err.Clear
-            On Error GoTo 0
             GoTo NextSheet
         End If
-        On Error GoTo 0
-        
-        For Each c In cells
-            Range(c).Select
-            
-            ' Zoom Level 2 = Bottom Level
-            result = HypZoomIn(Empty, Range(c), 2, False)
-            
-            If result <> 0 Then
-                MsgBox "Zoom failed on " & t & " at cell " & c
-            End If
+
+        ws.Activate
+
+        ' ---------------------------------------------------------
+        ' 1) FIRST ZOOM: A4
+        ' ---------------------------------------------------------
+        ws.Range("A4").Select
+        result = HypZoomIn(Empty, ws.Range("A4"), 2, False)
+
+        ' ---------------------------------------------------------
+        ' 2) NORMAL ZOOMS: C4, E4
+        ' ---------------------------------------------------------
+        For Each c In zoomCells
+            ws.Range(c).Select
+            result = HypZoomIn(Empty, ws.Range(c), 2, False)
         Next c
-        
+
+        ' ---------------------------------------------------------
+        ' 3) FULL‑COLUMN ZOOM ON COLUMN C
+        ' ---------------------------------------------------------
+        ws.Range("C:C").Select
+        result = HypMenuVZoomIn()
+
+        If result <> 0 Then
+            MsgBox "Column C zoom failed on " & t
+        End If
+
 NextSheet:
+        Set ws = Nothing
     Next t
-    
-    MsgBox "All Zoom‑Ins Completed."
+
+    MsgBox "All Zoom‑Ins Completed (no Q‑row deletion)."
 
 End Sub
