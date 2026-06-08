@@ -36,11 +36,12 @@ Sub DeleteCurrentYearRows_FromTable2()
     On Error GoTo 0
 
     '---------------------------------------------
-    ' 5) Clear filter
+    ' 5) Reset ALL filters on MasterData
     '---------------------------------------------
-    If wsDest.AutoFilterMode Then wsDest.AutoFilterMode = False
+    If wsDest.AutoFilterMode Then
+        wsDest.AutoFilterMode = False
+    End If
 
-    MsgBox "Rows for year " & currentYear & " deleted."
+    MsgBox "Rows for year " & currentYear & " deleted and filters reset."
 
 End Sub
-
