@@ -3,12 +3,10 @@ Private Declare Function HypZoomIn Lib "HsAddin" _
 (ByVal vtSheetName As Variant, ByVal vtSelection As Variant, _
  ByVal vtLevel As Variant, ByVal vtAcross As Variant) As Long
 
-Sub ZoomAllTabs()
+Sub ZoomAllTabs_And_RemoveQRows_WithSecondZoom()
 
     Dim tabs As Variant
-    Dim cells As Variant
     Dim t As Variant
-    Dim c As Variant
     Dim result As Long
     Dim ws As Worksheet
     Dim lastRow As Long
@@ -17,32 +15,26 @@ Sub ZoomAllTabs()
     ' Tabs to process
     tabs = Array("Essbase Actuals", "Essbase Forecast", "Essbase Budget")
     
-    ' Cells to zoom in on AFTER cleaning
-    cells = Array("C4", "E4")
-    
     For Each t In tabs
         
         On Error Resume Next
         Set ws = Worksheets(t)
+        On Error GoTo 0
+        
         If ws Is Nothing Then
             MsgBox "Sheet not found: " & t
-            Err.Clear
-            On Error GoTo 0
             GoTo NextSheet
         End If
-        On Error GoTo 0
         
         ws.Activate
         
         ' ---------------------------------------------------------
-        ' 1) FIRST ZOOM: A4 (before deleting Q rows)
+        ' 1) FIRST ZOOM: A4
         ' ---------------------------------------------------------
         ws.Range("A4").Select
         result = HypZoomIn(Empty, ws.Range("A4"), 2, False)
         
-        If result <> 0 Then
-            MsgBox "Zoom failed on " & t & " at cell A4"
-        End If
+        If result <> 0 Then MsgBox "Zoom failed on " & t & " at A4"
         
         ' ---------------------------------------------------------
         ' 2) DELETE ROWS WHERE COLUMN A CONTAINS "Q"
@@ -56,21 +48,39 @@ Sub ZoomAllTabs()
         Next i
         
         ' ---------------------------------------------------------
-        ' 3) CONTINUE ORIGINAL ZOOMS (C4, E4, etc.)
+        ' 3) NORMAL ZOOMS: C4, E4
         ' ---------------------------------------------------------
-        For Each c In cells
+        Dim zoomCells As Variant
+        Dim c As Variant
+        
+        zoomCells = Array("C4", "E4")
+        
+        For Each c In zoomCells
             ws.Range(c).Select
             result = HypZoomIn(Empty, ws.Range(c), 2, False)
-            
-            If result <> 0 Then
-                MsgBox "Zoom failed on " & t & " at cell " & c
-            End If
+            If result <> 0 Then MsgBox "Zoom failed on " & t & " at " & c
         Next c
+        
+        ' ---------------------------------------------------------
+        ' 4) SECOND ZOOM PASS ON ALL POPULATED CELLS IN COLUMN C
+        ' ---------------------------------------------------------
+        lastRow = ws.Cells(ws.Rows.Count, "C").End(xlUp).Row
+        
+        For i = 5 To lastRow   ' start at row 5 to skip headers
+            If Trim(ws.Cells(i, "C").Value) <> "" Then
+                ws.Cells(i, "C").Select
+                result = HypZoomIn(Empty, ws.Cells(i, "C"), 2, False)
+                
+                If result <> 0 Then
+                    MsgBox "Second zoom failed on " & t & " at C" & i
+                End If
+            End If
+        Next i
         
 NextSheet:
         Set ws = Nothing
     Next t
     
-    MsgBox "All Zoom‑Ins and Q‑Row Removals Completed."
+    MsgBox "All Zoom‑Ins (including second pass) Completed."
 
 End Sub
