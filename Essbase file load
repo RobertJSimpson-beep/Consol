@@ -1,16 +1,21 @@
-Sub ImportEssbaseData_Fast()
+Sub ImportEssbaseData_Table2()
 
     Dim srcWb As Workbook
     Dim wsSrc As Worksheet
     Dim wsDest As Worksheet
     Dim wsInput As Worksheet
+    Dim lo As ListObject
     Dim filePath As Variant
     Dim srcSheets As Variant
     Dim sheetName As Variant
     Dim lastRowSrc As Long
-    Dim lastRowDest As Long
-    Dim currentYear As Variant
+    Dim currentYear As Long
+    Dim priorYear As Long
     Dim labelText As String
+    Dim dataRows As Long
+    Dim insertRow As Long
+    Dim rngYearCol As Range
+    Dim f As Range
 
     ' ---------------------------------------------------------
     ' SPEED BOOSTERS
@@ -24,6 +29,7 @@ Sub ImportEssbaseData_Fast()
     ' ---------------------------------------------------------
     Set wsInput = ThisWorkbook.Worksheets("Input")
     currentYear = wsInput.ListObjects("Parameter_Year").ListColumns("Year").DataBodyRange.Cells(1, 1).Value
+    priorYear = currentYear - 1
 
     ' ---------------------------------------------------------
     ' 1) Ask user to select the Essbase workbook
@@ -37,30 +43,51 @@ Sub ImportEssbaseData_Fast()
     Set srcWb = Workbooks.Open(filePath)
 
     ' ---------------------------------------------------------
-    ' 2) Destination sheet
+    ' 2) Destination sheet and table
     ' ---------------------------------------------------------
     Set wsDest = ThisWorkbook.Worksheets("MasterData")
+    Set lo = wsDest.ListObjects("Table2")
 
     ' ---------------------------------------------------------
-    ' 3) FAST CLEARING OF CURRENT YEAR ROWS USING AUTOFILTER
+    ' 3) FILTER Table2 to current year in Year column and CLEAR A:K
     ' ---------------------------------------------------------
-    With wsDest
-        If .Range("A1").CurrentRegion.Rows.Count > 1 Then
-            .Range("A1").CurrentRegion.AutoFilter Field:=11, Criteria1:=CStr(currentYear)
-            On Error Resume Next
-            .Range("A1").CurrentRegion.Offset(1).SpecialCells(xlCellTypeVisible).Columns("A:I").ClearContents
-            On Error GoTo 0
-            .AutoFilterMode = False
-        End If
+    With lo
+        ' Filter on Year column (contains current year)
+        .Range.AutoFilter Field:=.ListColumns("Year").Index, _
+                          Criteria1:="=*" & CStr(currentYear) & "*"
+
+        On Error Resume Next
+        ' Clear A:K for visible rows in the table body
+        Intersect(.DataBodyRange.SpecialCells(xlCellTypeVisible), _
+                  .DataBodyRange.Columns("A:K")).ClearContents
+        On Error GoTo 0
+
+        ' Remove filter
+        If wsDest.AutoFilterMode Then wsDest.AutoFilterMode = False
     End With
 
     ' ---------------------------------------------------------
-    ' 4) Sheets to import
+    ' 4) FIND first row AFTER prior year (e.g. after 2025) in column K
+    ' ---------------------------------------------------------
+    Set rngYearCol = lo.ListColumns("Year").DataBodyRange
+
+    Set f = rngYearCol.Find(What:=priorYear, LookIn:=xlValues, LookAt:=xlWhole, _
+                            SearchOrder:=xlByRows, SearchDirection:=xlPrevious)
+
+    If Not f Is Nothing Then
+        insertRow = f.Row + 1          ' first row after prior year
+    Else
+        ' If prior year not found, start at first data row of the table
+        insertRow = lo.DataBodyRange.Rows(1).Row
+    End If
+
+    ' ---------------------------------------------------------
+    ' 5) Sheets to import
     ' ---------------------------------------------------------
     srcSheets = Array("Essbase Actual", "Essbase Forecast", "Essbase Budget")
 
     ' ---------------------------------------------------------
-    ' 5) Loop through each Essbase sheet
+    ' 6) Loop through each Essbase sheet and paste after prior year
     ' ---------------------------------------------------------
     For Each sheetName In srcSheets
 
@@ -71,25 +98,29 @@ Sub ImportEssbaseData_Fast()
         If wsSrc Is Nothing Then GoTo NextSheet
 
         lastRowSrc = wsSrc.Cells(wsSrc.Rows.Count, "A").End(xlUp).Row
-        If lastRowSrc < 4 Then GoTo NextSheet
+        If lastRowSrc < 4 Then GoTo NextSheet   ' no data
 
-        lastRowDest = wsDest.Cells(wsDest.Rows.Count, "A").End(xlUp).Row + 1
+        dataRows = lastRowSrc - 3               ' rows from 4 to lastRowSrc
 
+        ' Label for Column J
         Select Case sheetName
             Case "Essbase Actual": labelText = "Actual"
             Case "Essbase Forecast": labelText = "Forecast"
             Case "Essbase Budget": labelText = "Budget"
         End Select
 
-        ' Copy values only (MUCH faster than .Copy)
-        wsDest.Range("A" & lastRowDest & ":I" & (lastRowDest + lastRowSrc - 4)).Value = _
+        ' Copy A:I values into Table2 starting at insertRow
+        wsDest.Range("A" & insertRow).Resize(dataRows, 9).Value = _
             wsSrc.Range("A4:I" & lastRowSrc).Value
 
         ' Column J (label)
-        wsDest.Range("J" & lastRowDest & ":J" & (lastRowDest + lastRowSrc - 4)).Value = labelText
+        wsDest.Range("J" & insertRow).Resize(dataRows, 1).Value = labelText
 
         ' Column K (year)
-        wsDest.Range("K" & lastRowDest & ":K" & (lastRowDest + lastRowSrc - 4)).Value = currentYear
+        wsDest.Range("K" & insertRow).Resize(dataRows, 1).Value = currentYear
+
+        ' Move insertRow down for next sheet
+        insertRow = insertRow + dataRows
 
 NextSheet:
         Set wsSrc = Nothing
