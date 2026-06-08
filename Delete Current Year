@@ -1,1 +1,46 @@
+Sub DeleteCurrentYearRows_FromTable2()
+
+    Dim wsDest As Worksheet
+    Dim wsInput As Worksheet
+    Dim lo As ListObject
+    Dim currentYear As Variant
+    Dim yearColumnIndex As Long
+
+    '---------------------------------------------
+    ' 1) Get current year from Parameter_Year table
+    '---------------------------------------------
+    Set wsInput = ThisWorkbook.Worksheets("Input")
+    currentYear = wsInput.ListObjects("Parameter_Year") _
+                        .ListColumns("Year").DataBodyRange.Cells(1, 1).Value
+
+    '---------------------------------------------
+    ' 2) Reference Table2 on MasterData
+    '---------------------------------------------
+    Set wsDest = ThisWorkbook.Worksheets("MasterData")
+    Set lo = wsDest.ListObjects("Table2")
+
+    ' Find the column index of "Year" inside the table
+    yearColumnIndex = lo.ListColumns("Year").Index
+
+    '---------------------------------------------
+    ' 3) Apply filter to show only the current year
+    '---------------------------------------------
+    lo.Range.AutoFilter Field:=yearColumnIndex, _
+                        Criteria1:=CStr(currentYear)
+
+    '---------------------------------------------
+    ' 4) Delete the visible rows (current year rows)
+    '---------------------------------------------
+    On Error Resume Next
+    lo.DataBodyRange.SpecialCells(xlCellTypeVisible).EntireRow.Delete
+    On Error GoTo 0
+
+    '---------------------------------------------
+    ' 5) Clear filter
+    '---------------------------------------------
+    If wsDest.AutoFilterMode Then wsDest.AutoFilterMode = False
+
+    MsgBox "Rows for year " & currentYear & " deleted."
+
+End Sub
 
