@@ -1,0 +1,23 @@
+Sub RefreshSmartViewConnection()
+
+    Dim result As Long
+
+    ' Attempt to reconnect Smart View
+    result = HypConnect(Empty, Empty, Empty, Empty)
+
+    If result <> 0 Then
+        MsgBox "Smart View connection failed. Please log in manually."
+        Exit Sub
+    End If
+
+    ' Refresh the active sheet
+    result = HypMenuVRefresh()
+
+    If result <> 0 Then
+        MsgBox "Smart View refresh failed."
+        Exit Sub
+    End If
+
+    MsgBox "Smart View connection refreshed successfully."
+
+End Sub
