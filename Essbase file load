@@ -9,13 +9,13 @@ Sub ImportEssbaseData()
     Dim sheetName As Variant
     Dim lastRowSrc As Long
     Dim lastRowDest As Long
-    Dim currentYear As Long
+    Dim currentYear As Variant
     Dim i As Long
     Dim labelText As String
+    Dim cellYear As Variant
 
     ' ---------------------------------------------------------
     ' 0) Get current year from Parameter_Year table on Input sheet
-    '    Assumes the table has a column named "Year"
     ' ---------------------------------------------------------
     Set wsInput = ThisWorkbook.Worksheets("Input")
     currentYear = wsInput.ListObjects("Parameter_Year").ListColumns("Year").DataBodyRange.Cells(1, 1).Value
@@ -41,12 +41,15 @@ Sub ImportEssbaseData()
 
     ' ---------------------------------------------------------
     ' 3) Clear A:I for rows where Column K = current year
+    '    (Fix: compare as strings to avoid text/number mismatch)
     ' ---------------------------------------------------------
     Dim lastRowDestAll As Long
     lastRowDestAll = wsDest.Cells(wsDest.Rows.Count, "K").End(xlUp).Row
 
     For i = lastRowDestAll To 1 Step -1
-        If wsDest.Cells(i, "K").Value = currentYear Then
+        cellYear = Trim(wsDest.Cells(i, "K").Value)
+
+        If CStr(cellYear) = CStr(currentYear) Then
             wsDest.Range("A" & i & ":I" & i).ClearContents
         End If
     Next i
