@@ -1,16 +1,12 @@
-' Smart View API declarations
+' Smart View API declaration
 Private Declare Function HypZoomIn Lib "HsAddin" _
 (ByVal vtSheetName As Variant, ByVal vtSelection As Variant, _
  ByVal vtLevel As Variant, ByVal vtAcross As Variant) As Long
 
 Private Declare Function HypMenuVZoomIn Lib "HsAddin" () As Long
-Private Declare Function HypMenuVRefresh Lib "HsAddin" () As Long
-Private Declare Function HypConnect Lib "HsAddin" _
-(ByVal vtSheetName As Variant, ByVal vtUser As Variant, _
- ByVal vtPassword As Variant, ByVal vtURL As Variant) As Long
 
 
-Sub FullProcess_Essbase_RefreshZoom_Copy()
+Sub ZoomAllTabs_WithColumnCZoom()
 
     Dim tabs As Variant
     Dim t As Variant
@@ -18,49 +14,19 @@ Sub FullProcess_Essbase_RefreshZoom_Copy()
     Dim ws As Worksheet
     Dim lastRow As Long
     Dim i As Long
+    Dim zoomCells As Variant
+    Dim c As Variant
 
-    Dim srcSheets As Variant
-    Dim sheetName As Variant
-    Dim wsSrc As Worksheet
-    Dim wsDest As Worksheet
-    Dim lastRowSrc As Long
-    Dim lastRowDest As Long
-    Dim first2026Row As Long
-    Dim labelText As String
-    Dim srcWb As Workbook
-    Dim filePath As Variant
-    Dim v As Variant
-    Dim lastRowK As Long
-
-    ' ---------------------------------------------------------
-    ' 0) Ask user to select the Essbase workbook
-    ' ---------------------------------------------------------
-    filePath = Application.GetOpenFilename( _
-                FileFilter:="Excel Files (*.xlsx;*.xlsm),*.xlsx;*.xlsm", _
-                Title:="Select the Essbase Source File")
-
-    If filePath = False Then
-        MsgBox "No file selected. Process cancelled."
-        Exit Sub
-    End If
-
-    Set srcWb = Workbooks.Open(filePath)
-
-    ' ---------------------------------------------------------
-    ' 1) Refresh Smart View connection
-    ' ---------------------------------------------------------
-    result = HypConnect(Empty, Empty, Empty, Empty)
-    result = HypMenuVRefresh()
-
-    ' ---------------------------------------------------------
-    ' 2) Perform Zoom + Clean on each Essbase tab
-    ' ---------------------------------------------------------
+    ' Tabs to process
     tabs = Array("Essbase Actuals", "Essbase Forecast", "Essbase Budget")
+
+    ' Cells to zoom in on (after A4)
+    zoomCells = Array("C4", "E4")
 
     For Each t In tabs
 
         On Error Resume Next
-        Set ws = srcWb.Worksheets(t)
+        Set ws = Worksheets(t)
         On Error GoTo 0
 
         If ws Is Nothing Then
@@ -70,11 +36,15 @@ Sub FullProcess_Essbase_RefreshZoom_Copy()
 
         ws.Activate
 
-        ' --- Zoom A4 ---
+        ' ---------------------------------------------------------
+        ' 1) FIRST ZOOM: A4
+        ' ---------------------------------------------------------
         ws.Range("A4").Select
         result = HypZoomIn(Empty, ws.Range("A4"), 2, False)
 
-        ' --- Delete rows containing Q in Column A ---
+        ' ---------------------------------------------------------
+        ' 2) DELETE ROWS WHERE COLUMN A CONTAINS "Q"
+        ' ---------------------------------------------------------
         lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
 
         For i = lastRow To 1 Step -1
@@ -83,73 +53,30 @@ Sub FullProcess_Essbase_RefreshZoom_Copy()
             End If
         Next i
 
-        ' --- Zoom C4 and E4 ---
-        Dim zoomCells As Variant
-        Dim c As Variant
-        zoomCells = Array("C4", "E4")
-
+        ' ---------------------------------------------------------
+        ' 3) NORMAL ZOOMS: C4, E4
+        ' ---------------------------------------------------------
         For Each c In zoomCells
             ws.Range(c).Select
             result = HypZoomIn(Empty, ws.Range(c), 2, False)
         Next c
 
-        ' --- Zoom ENTIRE COLUMN C using Smart View menu command ---
+        ' ---------------------------------------------------------
+        ' 4) FULL‑COLUMN ZOOM ON COLUMN C
+        '     (same behaviour as manually selecting column C
+        '      and pressing Smart View → Zoom In)
+        ' ---------------------------------------------------------
         ws.Range("C:C").Select
         result = HypMenuVZoomIn()
+
+        If result <> 0 Then
+            MsgBox "Column C zoom failed on " & t
+        End If
 
 NextSheet:
         Set ws = Nothing
     Next t
 
-    ' ---------------------------------------------------------
-    ' 3) Copy cleaned data into MasterData in THIS workbook
-    ' ---------------------------------------------------------
-    Set wsDest = ThisWorkbook.Worksheets("MasterData")
-    srcSheets = Array("Essbase Actuals", "Essbase Forecast", "Essbase Budget")
-
-    ' --- Find first row where Column K = 2026 ---
-    first2026Row = 0
-    lastRowK = wsDest.Cells(wsDest.Rows.Count, "K").End(xlUp).Row
-
-    For i = 1 To lastRowK
-        v = wsDest.Cells(i, "K").Value
-        If Trim(v) <> "" Then
-            If Val(v) = 2026 Then
-                first2026Row = i
-                Exit For
-            End If
-        End If
-    Next i
-
-    If first2026Row = 0 Then
-        MsgBox "No row with 2026 found in Column K on MasterData."
-        Exit Sub
-    End If
-
-    ' --- Clear A:I from that row downward ---
-    wsDest.Range("A" & first2026Row & ":I" & wsDest.Rows.Count).ClearContents
-
-    ' --- Loop through each Essbase sheet and append data ---
-    For Each sheetName In srcSheets
-
-        Set wsSrc = srcWb.Worksheets(sheetName)
-
-        lastRowSrc = wsSrc.Cells(wsSrc.Rows.Count, "A").End(xlUp).Row
-        lastRowDest = wsDest.Cells(wsDest.Rows.Count, "A").End(xlUp).Row + 1
-
-        Select Case sheetName
-            Case "Essbase Actuals": labelText = "Actual"
-            Case "Essbase Forecast": labelText = "Forecast"
-            Case "Essbase Budget": labelText = "Budget"
-        End Select
-
-        If lastRowSrc >= 5 Then
-            wsSrc.Range("A5:I" & lastRowSrc).Copy wsDest.Range("A" & lastRowDest)
-            wsDest.Range("J" & lastRowDest & ":J" & (lastRowDest + (lastRowSrc - 5))).Value = labelText
-        End If
-
-    Next sheetName
-
-    MsgBox "Process completed successfully."
+    MsgBox "All Zoom‑Ins Completed (including full Column C zoom)."
 
 End Sub
