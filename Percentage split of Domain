@@ -8,30 +8,20 @@
             }
         ),
 
-    // 2. Merge totals back to the main table
-    #"Merged Back Totals" =
-        Table.NestedJoin(
-            #"Removed Other Columns",
-            {"Merged"},
-            #"Grouped Totals",
-            {"Merged"},
-            "GroupData",
-            JoinKind.LeftOuter
-        ),
-
-    #"Expanded Totals" =
-        Table.ExpandTableColumn(
-            #"Merged Back Totals",
-            "GroupData",
-            {"TotalYTD"},
-            {"TotalYTD"}
-        ),
-
-    // 3. Add percentage split column
-    #"Added Percent Split" =
+    // 2. Calculate the grand total of all YTD values
+    #"Added Grand Total" =
         Table.AddColumn(
-            #"Expanded Totals",
-            "PercentSplit",
-            each [#"OPEX&RES Dec26 YTD"] / [TotalYTD],
+            #"Grouped Totals",
+            "GrandTotal",
+            each List.Sum(#"Grouped Totals"[TotalYTD]),
+            type number
+        ),
+
+    // 3. Add percentage share column
+    #"Added Percent Share" =
+        Table.AddColumn(
+            #"Added Grand Total",
+            "PercentShare",
+            each [TotalYTD] / [GrandTotal],
             type number
         )
