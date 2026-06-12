@@ -1,43 +1,37 @@
-let
-    Source = PreviousStepName,
-
     // 1. Group by Merged and sum the YTD column
-    Grouped = 
+    #"Grouped Totals" =
         Table.Group(
-            Source,
+            #"Removed Other Columns",
             {"Merged"},
             {
                 {"TotalYTD", each List.Sum([#"OPEX&RES Dec26 YTD"]), type number}
             }
         ),
 
-    // 2. Merge totals back to original table
-    MergedBack = 
+    // 2. Merge totals back to the main table
+    #"Merged Back Totals" =
         Table.NestedJoin(
-            Source,
+            #"Removed Other Columns",
             {"Merged"},
-            Grouped,
+            #"Grouped Totals",
             {"Merged"},
             "GroupData",
             JoinKind.LeftOuter
         ),
 
-    Expanded = 
+    #"Expanded Totals" =
         Table.ExpandTableColumn(
-            MergedBack,
+            #"Merged Back Totals",
             "GroupData",
             {"TotalYTD"},
             {"TotalYTD"}
         ),
 
     // 3. Add percentage split column
-    AddedPercent = 
+    #"Added Percent Split" =
         Table.AddColumn(
-            Expanded,
+            #"Expanded Totals",
             "PercentSplit",
             each [#"OPEX&RES Dec26 YTD"] / [TotalYTD],
             type number
         )
-in
-    AddedPercent
-
